@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Real-Time Flight Booking</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+
+<h1 class="text-3xl font-bold mb-4 text-center">Flight Booking System</h1>
+
+<div class="max-w-2xl mx-auto bg-white p-6 rounded shadow">
+<form id="flightForm" class="space-y-3">
+  <input class="border p-2 w-full" type="text" id="from_city" placeholder="From" required>
+  <input class="border p-2 w-full" type="text" id="to_city" placeholder="To" required>
+  <input class="border p-2 w-full" type="date" id="date" required>
+  <input class="border p-2 w-full" type="number" id="travelers" min="1" value="1" placeholder="Travelers">
+  <button class="bg-blue-500 text-white px-4 py-2 rounded" type="submit">Search Flights</button>
+</form>
+</div>
+
+<h2 class="text-2xl font-bold mt-6 mb-2 text-center">Available Flights</h2>
+<div id="results" class="max-w-3xl mx-auto grid gap-4"></div>
+
+<div id="bookingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+  <div class="bg-white p-6 rounded shadow w-96">
+    <h3 class="text-xl font-bold mb-4">Booking Details</h3>
+    <div id="modalContent"></div>
+    <input id="passengerName" class="border p-2 w-full mt-2" placeholder="Passenger Name" />
+    <input id="passengerEmail" class="border p-2 w-full mt-2" placeholder="Email" />
+    <input id="passengerPhone" class="border p-2 w-full mt-2" placeholder="Phone" />
+    <button id="confirmBooking" class="bg-green-500 text-white px-4 py-2 mt-4 rounded">Confirm Booking</button>
+    <button onclick="closeModal()" class="bg-red-500 text-white px-4 py-2 mt-2 rounded">Cancel</button>
+  </div>
+</div>
+
+<script>
+let selectedFlight = null;
+
+const form = document.getElementById('flightForm');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const from_city = document.getElementById('from_city').value;
+  const to_city = document.getElementById('to_city').value;
+  const date = document.getElementById('date').value;
+  const travelers = document.getElementById('travelers').value;
+
+  const response = await fetch('http://127.0.0.1:8000/search_flights', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({from_city, to_city, date, travelers})
+  });
+
+  const data = await response.json();
+  const resultsDiv = document.getElementById('results');
+  resultsDiv.innerHTML = '';
+
+  data.flights.forEach(flight => {
+    const flightCard = document.createElement('div');
+    flightCard.className = 'bg-white p-4 rounded shadow flex justify-between items-center';
+    flightCard.innerHTML = `
+      <div>
+        <p class="font-bold">${flight.airline} (${flight.flight_number})</p>
+        <p>${flight.from} → ${flight.to}</p>
+        <p>${flight.departure} - ${flight.arrival} | ${flight.duration}</p>
+        <p>Seats: ${flight.seats_available}</p>
+      </div>
+      <div class="text-right">
+        <p class="text-lg font-bold">₹${flight.price}</p>
+        <button onclick='openModal(${JSON.stringify(flight)})' class="bg-blue-500 text-white px-3 py-1 mt-2 rounded">Book</button>
+      </div>
+    `;
+    resultsDiv.appendChild(flightCard);
+  });
+});
+
+function openModal(flight) {
+  selectedFlight = flight;
+  document.getElementById('modalContent').innerHTML = `
+    <p><strong>${flight.airline} (${flight.flight_number})</strong></p>
+    <p>${flight.from} → ${flight.to}</p>
+    <p>${flight.departure} - ${flight.arrival} | ${flight.duration}</p>
+    <p>Total Price: ₹${flight.price}</p>
+  `;
+  document.getElementById('bookingModal').classList.remove('hidden');
+  document.getElementById('bookingModal').classList.add('flex');
+}
+
+function closeModal() {
+  document.getElementById('bookingModal').classList.add('hidden');
+  document.getElementById('bookingModal').classList.remove('flex');
+}
+
+document.getElementById('confirmBooking').addEventListener('click', async () => {
+  const name = document.getElementById('passengerName').value;
+  const email = document.getElementById('passengerEmail').value;
+  const phone = document.getElementById('passengerPhone').value;
+
+  if(!name || !email || !phone) { alert('Please fill all details'); return; }
+
+  const response = await fetch('http://127.0.0.1:8000/book_flight', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({...selectedFlight, passenger: {name, email, phone}})
+  });
+
+  const data = await response.json();
+  alert(`Booking Confirmed! ID: ${data.booking_id}`);
+  closeModal();
+});
+</script>
+</body>
+</html>
